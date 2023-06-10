@@ -1,0 +1,22 @@
+type table ATable -> "The Table!" {
+   name: text -> "Name:";
+   number: integer -> "Number:";
+};
+
+t: ATable;
+t := new; -- new empty table
+c: integer;
+c := 1;
+
+["One", c] >> t; -- add line at the end of the table
+[] >> t; -- add empty (undefined) line at the end of the table
+c := c+1;
+["Two", c] >> t;
+[] >> t; -- add empty (undefined) line at the end of the table
+c := c+1;
+["Three", c] >> t;
+[] >> t; -- add empty (undefined) line at the end of the table
+
+println t;
+
+println "Yet another print of a table" center (4 + length t.name + length t.number + 3); -- centers string in table (assuming on extra character before, between, and after each column) 

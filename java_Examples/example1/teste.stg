@@ -1,0 +1,45 @@
+defineClassTable(classname, var,varType,name) ::= <<
+    public class <classname> extends table {
+        <var,varType:{ var,varType | List\<<varType>\> <var> = new ArrayList\<\>();}; separator="\n">
+
+        <classname>(){
+            <var,name:{ var,name | headersMap.put("<var>","<name>");}; separator="\n">
+        }
+
+        @Override
+        public String toString() {
+            List\<String\> format = new ArrayList\<\>();
+            System.out.println(headersMap.get("header"));
+            <var:preparePrintvar(); separator="\n">
+            String s = "";
+            for (String string : format) {
+                s += string;
+            }
+            s+= "|%n";
+            System.out.printf(s, <var:headersMap(); separator=",">);
+            for (int i = 0; i \< name.size(); i++) {
+                System.out.printf(s, <var:columGet(); separator=",">);
+            }
+            return "\n";
+        }
+    }
+>>
+
+preparePrintvar(var) ::= <<
+int <var>MaxSize = headersMap.get("<var>").length();
+for (Object string : <var>) {
+    if(string.toString().length() \> <var>MaxSize) <var>MaxSize = string.toString().length();
+}
+format.add("| %"+<var>MaxSize+"s ");
+>>
+
+headersMap(var) ::= <<
+    headersMap.get("<var>")
+>>
+
+columGet(var) ::= <<
+    <var>.get(i)
+>>
+
+
+

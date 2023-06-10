@@ -1,0 +1,315 @@
+varTypes ::= [
+   "integer":"int",
+   "real":"double",
+   "boolean":"boolean",
+   "text":"String",
+   default:"null"
+]
+
+booleanValue ::= [
+   "true":"true",
+   "false":"false",
+   default:"null"
+]
+
+castTypes ::= [
+   "String":"String",
+   "double":"Double",
+   "int":"Integer"
+]
+
+primToClass ::= [
+   "double":"Double",
+   "int":"Integer",
+   "String":"String"
+]
+
+module(name,stat,class) ::= <<
+import java.util.*;
+
+public class <name> {
+   <classes(class)>
+   public static void main(String[] args) {
+      <name> o = new <name>();
+      Scanner scan;
+      <stats(stat)>
+   }
+   public static String centerString (int width, String s){
+      return String.format("%-" + width  + "s", String.format("%" + (s.length() + (width - s.length()) / 2) + "s", s));
+   }
+}
+>>
+
+stats(stat) ::= <<
+<if(stat)><stat; separator="\n"><endif>
+>>
+
+assign(stat,var,value) ::= <<
+<stats(stat)>
+<var> = <value>;
+>>
+
+justAssign(var,value) ::= <<
+<var> = <value>;
+>>
+
+assignNew(stat,var,type) ::= <<
+<var> = o.new <type>(); <if(stat)><\n><stats(stat)><endif>
+>>
+
+convertList(list, from, to, newList) ::= <<
+for(<primToClass.(from)> a : <list>) <newList>.add(<primToClass.(to)>.valueOf(a));
+>>
+
+println(value) ::= "System.out.println(<value>);"
+
+printnoln(value) ::= "System.out.print(<value>);"
+
+classes(class) ::= <<
+<if(class)> <class; separator="\n\n"><endif>
+>>
+
+// TODO - provavelmente poderiamos utilizar o assign em vez de tableExpr
+tableExpr(var, value) ::= <<
+<var> = <value>;
+>>
+
+type(type) ::= "<type>"
+
+createObject(var) ::= "new <var>;"
+
+replaceKey(map,old,new) ::= "<map>.put(\"<new>\", <map>.remove(\"<old>\"));"
+
+declareVar(varType, varName, value) ::= "<varType> <varName><if(value)> = <value><endif>;"
+declareList(varType, varName) ::= "List\<<primToClass.(varType)>> <varName> = new ArrayList\<>();"
+
+
+inLineIF(stat,varType,varName,e1,e2,e3) ::= <<
+<stats(stat)>
+<declareVar(varType, varName, [e1," ","?"," ",e2," ",":"," ",e3])>
+>>
+
+opExpression(stat,varType,varName,e1,op,e2) ::= <<
+<stats(stat)>
+<declareVar(varType, varName, [e1," ",op," ",e2])>
+>>
+
+literalBoolean(value) ::= "<booleanValue.(value)>"
+
+//Reads
+readVartypes ::= [
+   "integer":"nextInt",
+   "real":"nextDouble",
+   "boolean":"nextBoolean",
+   "text":"nextLine",
+   default:"null"
+]
+
+readStdInput(text,varType,varName) ::= <<
+<if(text)><println(text)><endif>
+scan = new Scanner(System.in);
+<declareVar(varType, varName, "scan.nextLine()")>
+scan.close();
+>>
+
+//Talvez não seja necessário porque vai ser a outra gramática a tratar disto
+readFile(name, file) ::= <<
+Map\<String,List\<String\>\> <name> = ReadCsvFileMain.read(<file>);
+>>
+//End of Reads
+
+castNumeric(stat,castType,varName,value) ::= <<
+<stats(stat)>
+<declareVar(castType, varName, ["(",varTypes.(castType),")",value])>
+>>
+
+castString(stat,castType,varName,value) ::= <<
+<stats(stat)>
+<declareVar(castType, varName, [castTypes.(castType),".valueOf(",value,")"])>
+>>
+
+forLoop(iterator, column, iterable, stat) ::= <<
+Iterator\<List\<Object\>\> iterator = <iterable>.getIterator();
+List\<Object\> l;
+while(iterator.hasNext()){
+   l = iterator.next();
+   System.out.println(l.get(<iterable>.translatorMap.get("hello")));
+}
+>>
+
+
+//ClassTableCreation
+
+defineClassTable(classname, var,varType,name, tableHeader, formula) ::= <<
+public class <classname> extends AbstractTable {
+   <var,varType:{ var,varType | List\<<primToClass.(varType)>\> <var> = new ArrayList\<\>();}; separator="\n">
+   
+   int columnID = 0;
+   Map\<String, Integer\> translatorMap = Map.of(
+      <var:translatorMap(); separator=",\n">
+   );
+   
+   <classname>(){
+      <if(tableHeader)>this.setHeaderTable(<tableHeader>);<endif>
+      <var,name:{ var,name | headersMap.put("<var>",<if(name)><name><else>""<endif>);}; separator="\n">
+   }
+
+   <formulas(formula)>
+
+   public void checkSizes(){
+         List\<Integer\> t = Arrays.asList(<var:sizeGet(); separator=",">);
+         int tableSize = Collections.max(t);
+         <var:whileFillColumn(); separator="\n">
+   }
+
+   public Iterator\<List\<Object\>\> getIterator(){
+      return (this).new tableIterator();
+   }
+
+   private class tableIterator implements Iterator\<List\<Object\>\>{
+      private int idx;
+      tableIterator(){
+         checkSizes();
+         idx = -1;
+      }
+      public boolean hasNext(){
+         if(idx + 1 \< <first(var)>.size()){
+            return true;
+         }
+         return false;
+      }
+      public List\<Object\> next(){
+         if(hasNext()){
+            idx++;
+            return new ArrayList\<Object\>(Arrays.asList(<var: {var | <var>.get(idx)}; separator=", ">));
+         }
+         throw new NoSuchElementException("Out of Bounds");
+      }
+   }
+
+   @Override
+   public String toString() {
+      checkSizes();
+      List\<String\> format = new ArrayList\<\>();
+      System.out.println(headerTable);
+      <var:preparePrintvar(); separator="\n">
+      String s = "";
+      for (String string : format) {
+         s += string;
+      }
+      s+= "|%n";
+      System.out.printf(s, <var:headersMap(); separator=",">);
+      for (int i = 0; i \< <first(var)>.size(); i++) {
+         System.out.printf(s, <var:columGet(); separator=",">);
+      }
+      return "\n";
+   }
+}
+>>
+
+
+// TODO make this less redundant
+preparePrintvar(var) ::= <<
+int <var>MaxSize = columnSize(headersMap.get("<var>"),new ArrayList\<Object\>(<var>));
+format.add("| %"+<var>MaxSize+"s ");
+>>
+
+outsideColumnSize(tableName, columnName) ::= <<
+AbstractTable.columnSize(<tableName>.headersMap.get("<columnName>"),new ArrayList\<Object\>(<tableName>.<columnName>))
+>>
+
+whileFillColumn(var) ::=<<
+while(<var>.size() \< tableSize){
+   <var>.add(null);
+}
+>>
+
+translatorMap(var) ::=<<
+"<var>", columnID++
+>>
+
+headersMap(var) ::= <<
+    headersMap.get("<var>")
+>>
+
+columGet(var) ::= <<
+    <var>.get(i)
+>>
+
+sizeGet(var) ::= <<
+<var>.size()
+>>
+
+varAndVartype(var,varType, name) ::= <<
+<var>,<varType><if(name)>,<name><endif>
+>>
+
+Tableheader(var,text) ::=<<
+<var>.setHeaderTable(<text>);
+>>
+
+ColumHeader(var,text,colum) ::=<<
+<var>.setHeaderColum("<colum>",<text>);
+>>
+
+tableColum(var,colum) ::=<<
+<var>.<colum>
+>>
+
+argsToFormula(col) ::=<<
+<if(col)><col; separator=","><endif>
+>>
+
+addToFormula(var, colFormula, col) ::=<<
+<if(colFormula)><tableColum(var, colFormula)>.add(<var>.<colFormula>(<argsToFormula(col)>));<endif>
+>>
+
+addLineToTable(var, colum, text, textName) ::=<<
+<if(text)><text><endif>
+<tableColum(var, colum)>.add(<textName>);
+>>  
+
+viewColumn(varFrom, colum, varTo) ::=<<
+<varTo>.<colum> = <varFrom>.<colum>;
+>>
+
+fillColumnNull(size, var, colum, text, textName) ::=<<
+for (int index = 0; index \< <size>; index++) {
+    <addLineToTable(var, colum, text, textName)>
+}
+>>
+
+formulas(formula) ::=<<
+<if(formula)> <formula; separator="\n\n"><endif>
+>>
+
+formula(colVar, colVarType, retType, name, firstVar, firstVarType, var, varType, expr, retVar) ::=<<
+<colVar,colVarType:{colVar,colVarType | List\<<colVarType>\> <colVar> = new ArrayList\<\>();}; separator="\n">
+
+private <retType> <name>(<firstVarType> <firstVar> <if(var)>, <varType> <var><endif>){
+   <expr>
+   return <retVar>;
+}
+>>
+
+forLoopCreate(table,element,stat) ::=<<
+Iterator\<List\<Object\>\> <table>iterator = <table>.getIterator();
+while (<table>iterator.hasNext()){
+   List\<Object\> <element> = <table>iterator.next();
+   <stat>
+}
+>>
+
+tableColumWithTranslator(element,colunmName,table) ::=<<
+<element>.get(<table>.translatorMap.get("<colunmName>"))
+>>
+
+assignTableColumnFor(expr, element, colunmName, table, var) ::=<<
+<expr>
+>>
+
+opColumn(expr, newVar, columnName, table, var, element, op) ::=<<
+<expr> 
+Object <newVar> = <element>.get<table>.translatorMap.get("<columnName>") <op> <var>;
+<element>.add(<table>.translatorMap.get("<columnName>"), <newVar>);
+>>
